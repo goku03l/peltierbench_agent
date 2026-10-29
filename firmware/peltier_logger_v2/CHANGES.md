@@ -35,6 +35,8 @@ Your v1 sketch is untouched. This is a copy with the changes below. **It has not
 7. **NTC1/NTC2 are still not connected**, so there is no hot-side reading yet.
 
 ## Before the first flash
-1. Copy `secrets.h.example` to `secrets.h` and fill it in. Never commit `secrets.h`.
-2. Install the PubSubClient library.
-3. Flash once over USB. After that, updates can go over the air.
+1. Install the PubSubClient library (CI does this itself).
+2. Flash once over USB. After that, updates can go over the air.
+3. Set the credentials once in the serial monitor. They are stored in flash, not in the firmware image:
+   `cfg wifi <ssid>;<password>`, `cfg mqtt <host>;<port>;<user>;<password>;<topic base>`, then `reboot`.
+   `cfg` only works over USB, never over MQTT or the TCP port.
