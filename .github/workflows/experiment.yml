@@ -1,0 +1,66 @@
+name: experiment
+
+# Runs one hardware experiment through tools/bench.py (no AI in this job; it is a plain, bounded script)
+# and commits the result to ledger/ and data/runs/. Only one experiment runs at a time.
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:      { description: "Short label, letters/digits/-/_", required: true }
+      sp:       { description: "Setpoint, C (15..40)", required: true }
+      minutes:  { description: "Duration, minutes (max 180)", required: true, default: "60" }
+      params:   { description: "Parameter overrides, e.g. ki=0.6 kd=20 usedead=0", required: false, default: "" }
+      pre_sp:   { description: "Optional: first bring the bath to this setpoint", required: false, default: "" }
+      pre_minutes: { description: "Minutes for the pre-conditioning phase", required: false, default: "20" }
+      tmin:     { description: "Abort if the water goes below, C", required: false, default: "10" }
+      tmax:     { description: "Abort if the water goes above, C", required: false, default: "42" }
+
+concurrency:
+  group: rig
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    env:
+      MQTT_HOST: ${{ secrets.MQTT_HOST }}
+      MQTT_PORT: ${{ secrets.MQTT_PORT }}
+      MQTT_USER: ${{ secrets.MQTT_AGENT_USER }}
+      MQTT_PASS: ${{ secrets.MQTT_AGENT_PASS }}
+      MQTT_BASE: ${{ secrets.MQTT_BASE }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -r requirements.txt
+
+      - name: Run experiment
+        env:
+          TAG: ${{ inputs.tag }}
+          SP: ${{ inputs.sp }}
+          MINUTES: ${{ inputs.minutes }}
+          PARAMS: ${{ inputs.params }}
+          PRE_SP: ${{ inputs.pre_sp }}
+          PRE_MINUTES: ${{ inputs.pre_minutes }}
+          TMIN: ${{ inputs.tmin }}
+          TMAX: ${{ inputs.tmax }}
+        run: |
+          # inputs come in through env vars, never interpolated into the script text
+          ARGS=(experiment --tag "$TAG" --sp "$SP" --minutes "$MINUTES" --tmin "$TMIN" --tmax "$TMAX")
+          if [ -n "$PARAMS" ]; then read -r -a PARR <<< "$PARAMS"; ARGS+=(--set "${PARR[@]}"); fi
+          if [ -n "$PRE_SP" ]; then ARGS+=(--pre-sp "$PRE_SP" --pre-minutes "$PRE_MINUTES"); fi
+          python tools/bench.py "${ARGS[@]}"
+
+      - name: Commit results
+        if: always()
+        env:
+          TAG: ${{ inputs.tag }}
+        run: |
+          git config user.name "bench-bot"
+          git config user.email "bench-bot@users.noreply.github.com"
+          git add ledger data/runs
+          git diff --cached --quiet || (git commit -m "experiment: $TAG" && git pull --rebase && git push)

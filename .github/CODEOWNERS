@@ -1,0 +1,5 @@
+# Safety-relevant paths need a review from the owner.
+/tools/ @goku03l
+/.github/ @goku03l
+/firmware/ @goku03l
+/AGENTS.md @goku03l

@@ -1,0 +1,57 @@
+name: build-firmware
+
+on:
+  push:
+    paths: ["firmware/**", ".github/workflows/build-firmware.yml"]
+  pull_request:
+    paths: ["firmware/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: arduino/setup-arduino-cli@v2
+
+      - name: Install ESP32 core and libraries
+        run: |
+          arduino-cli config init
+          arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core update-index
+          arduino-cli core install esp32:esp32@3.0.7
+          arduino-cli lib install "PubSubClient@2.8.0"
+
+      - name: Compile
+        run: |
+          arduino-cli compile \
+            --fqbn esp32:esp32:esp32:PartitionScheme=min_spiffs \
+            --warnings default \
+            --output-dir build \
+            firmware/peltier_logger_v2
+          cp build/peltier_logger_v2.ino.bin build/firmware.bin
+          ls -l build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: firmware
+          path: |
+            build/firmware.bin
+            build/peltier_logger_v2.ino.bootloader.bin
+            build/peltier_logger_v2.ino.partitions.bin
+
+      # Every successful build on main becomes a release the rig can pull with: ota <url>
+      - name: Publish release
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: fw-${{ github.run_number }}
+          name: Firmware build ${{ github.run_number }}
+          body: |
+            Commit ${{ github.sha }}.
+            OTA URL: https://github.com/${{ github.repository }}/releases/download/fw-${{ github.run_number }}/firmware.bin
+          files: build/firmware.bin

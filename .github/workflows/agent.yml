@@ -1,0 +1,55 @@
+name: agent
+
+# The AI step. It reads the ledger, runs the simulator, decides the next experiment, and either dispatches the
+# 'experiment' workflow or proposes a firmware change as a pull request. It never talks to the rig itself.
+#
+# DISABLED until you add the Claude credentials (see README, step 5). To turn on scheduling, uncomment the cron.
+
+on:
+  workflow_dispatch:
+    inputs:
+      goal: { description: "Optional steer for this session", required: false, default: "" }
+  # schedule:
+  #   - cron: "*/30 * * * *"
+
+concurrency:
+  group: agent
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+  id-token: write
+
+jobs:
+  think:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install -r requirements.txt
+
+      - name: Is an experiment already running?
+        id: busy
+        env: { GH_TOKEN: "${{ github.token }}" }
+        run: |
+          N=$(gh run list --workflow experiment.yml --status in_progress --json databaseId --jq length)
+          Q=$(gh run list --workflow experiment.yml --status queued --json databaseId --jq length)
+          echo "running=$((N+Q))" >> "$GITHUB_OUTPUT"
+
+      - name: Agent session
+        if: steps.busy.outputs.running == '0'
+        uses: anthropics/claude-code-action@v1
+        env: { GH_TOKEN: "${{ github.token }}" }
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          prompt: |
+            Follow AGENTS.md. Read ledger/experiments.jsonl and ledger/NOTES.md, run the simulator as needed,
+            then do exactly one of: (a) dispatch the experiment workflow with `gh workflow run experiment.yml`,
+            (b) open a pull request with a firmware change, (c) update ledger/NOTES.md with conclusions.
+            Extra steer for this session: ${{ inputs.goal }}
+          claude_args: "--max-turns 30 --allowedTools Bash,Read,Write,Edit,Glob,Grep"
