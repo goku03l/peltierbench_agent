@@ -28,13 +28,19 @@ jobs:
 
       - name: Compile
         run: |
+          set +e
           arduino-cli compile \
             --fqbn esp32:esp32:esp32:PartitionScheme=min_spiffs \
             --warnings default \
             --output-dir build \
-            firmware/peltier_logger_v2
+            firmware/peltier_logger_v2 2>&1 | tee compile.log
+          rc=${PIPESTATUS[0]}
+          # surface compiler errors as annotations so they are readable without opening the raw log
+          grep -E "error|Error|undefined reference|overflowed|Sketch too big" compile.log | head -15 | while IFS= read -r l; do echo "::error::${l:0:400}"; done
+          if [ "$rc" -ne 0 ]; then exit "$rc"; fi
           cp build/peltier_logger_v2.ino.bin build/firmware.bin
           ls -l build
+          grep -E "Sketch uses|Global variables" compile.log
 
       - uses: actions/upload-artifact@v4
         with:
