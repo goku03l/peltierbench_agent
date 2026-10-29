@@ -1,0 +1,13 @@
+[Unit]
+Description=Peltier bench daemon (owns the ESP32 serial port)
+After=network.target
+
+[Service]
+User=peltier
+WorkingDirectory=/home/peltier/bench_repo
+ExecStart=/usr/bin/python3 tools/bench_local.py daemon --serial /dev/ttyUSB0
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

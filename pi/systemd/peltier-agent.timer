@@ -1,0 +1,9 @@
+[Unit]
+Description=Run a Peltier agent session when the rig is idle
+
+[Timer]
+OnBootSec=5min
+OnUnitInactiveSec=15min
+
+[Install]
+WantedBy=timers.target

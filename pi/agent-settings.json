@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Read", "Glob", "Grep", "Write", "Edit",
+      "Bash(python3 tools/bench_local.py:*)",
+      "Bash(python3 sim/*)",
+      "Bash(bash pi/flash.sh:*)",
+      "Bash(python3 pi/guard_check.py check)",
+      "Bash(touch ~/peltier-state/PAUSE)",
+      "Bash(git status:*)", "Bash(git diff:*)", "Bash(git log:*)", "Bash(git add:*)", "Bash(git commit:*)",
+      "Bash(git switch -c agent/*)", "Bash(git push origin agent/*)", "Bash(gh pr create:*)", "Bash(gh pr list:*)"
+    ],
+    "deny": [
+      "Edit(tools/**)", "Write(tools/**)", "Edit(.github/**)", "Write(.github/**)",
+      "Edit(AGENTS.md)", "Write(AGENTS.md)", "Edit(pi/**)", "Write(pi/**)",
+      "Edit(.claude/**)", "Write(.claude/**)",
+      "Bash(git push origin main:*)", "Bash(git push --force:*)", "Bash(git push -f:*)", "Bash(git push origin HEAD:main:*)",
+      "Bash(sudo:*)", "Bash(rm:*)", "Bash(curl:*)", "Bash(wget:*)", "Bash(ssh:*)"
+    ]
+  }
+}

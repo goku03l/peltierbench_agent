@@ -44,3 +44,16 @@ You do not talk to the rig directly. Only the `experiment` workflow does, throug
 - Heating is capped at duty 100 (39 percent). At 37.5 C and above the heater saturates.
 - In simulation the deadband with 30 s dwell causes small on/off cycling; `usedead=0` removes it. Confirm on the rig.
 - The simulator has no hot-side warm-up and no sensor lag by default, so it is optimistic.
+
+## Pi mode (agent runs unattended on the Raspberry Pi; authorised by the human on 2026-10-29)
+This section amends rules 3 and 5 for sessions started by `pi/agent_session.sh`. Everything else still applies.
+- Talk to the rig only through `python3 tools/bench_local.py` (never open the serial port yourself). Start an experiment and
+  end the session; the next session reads the result in `ledger/experiments.jsonl`. Do not use `wait`.
+- Firmware: you may flash with `bash pi/flash.sh` after `bash pi/flash.sh --compile` passes. You must bump `FW_VERSION`, keep
+  the change small, work on a branch `agent/<topic>`, and open a pull request with the evidence and the risk. You never push
+  to `main`; the human merges. If the human rejects the PR, the rig is reflashed from `main`.
+- `pi/flash.sh` refuses changes to protected constants and guards (`pi/guard_check.py`). If it refuses, do not try to work
+  around it: write a proposal in `ledger/NOTES.md` for the human.
+- You cannot edit `tools/`, `.github/`, `AGENTS.md`, `pi/` (enforced by `pi/agent-settings.json`).
+- Rule 6 is automatic: after a FAULT, an aborted run or a failed flash the runner creates `~/peltier-state/PAUSE` and no
+  session starts until the human removes it. If you notice something unsafe, `touch ~/peltier-state/PAUSE` yourself.

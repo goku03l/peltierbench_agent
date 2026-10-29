@@ -1,0 +1,3 @@
+# /etc/sudoers.d/peltier  (install with: sudo install -m 0440 pi/systemd/peltier-sudoers /etc/sudoers.d/peltier)
+# The agent may restart the daemon so it can flash, and nothing else.
+peltier ALL=(root) NOPASSWD: /usr/bin/systemctl stop peltier-daemon, /usr/bin/systemctl start peltier-daemon

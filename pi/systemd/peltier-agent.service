@@ -1,0 +1,10 @@
+[Unit]
+Description=One bounded Peltier agent session
+After=peltier-daemon.service
+
+[Service]
+Type=oneshot
+User=peltier
+WorkingDirectory=/home/peltier/bench_repo
+ExecStart=/bin/bash pi/agent_session.sh
+TimeoutStartSec=45min
