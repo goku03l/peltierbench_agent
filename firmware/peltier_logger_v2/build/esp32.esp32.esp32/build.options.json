@@ -1,0 +1,9 @@
+{
+  "additionalFiles": "..\\..",
+  "compiler.optimization_flags": "-Os",
+  "customBuildProperties": "",
+  "fqbn": "esp32:esp32:esp32:PartitionScheme=min_spiffs",
+  "hardwareFolders": "C:\\Users\\kgoku\\AppData\\Local\\Arduino15\\packages\\esp32\\hardware\\esp32\\3.3.12,C:\\Users\\kgoku\\AppData\\Local\\Arduino15\\packages\\esp32\\hardware\\esp32\\3.3.12",
+  "otherLibrariesFolders": "C:\\Users\\kgoku\\OneDrive\\Documents\\Arduino\\libraries",
+  "sketchLocation": "C:\\Users\\kgoku\\Desktop\\Remster\\Peltier Test RIG\\bench_repo\\firmware\\peltier_logger_v2"
+}

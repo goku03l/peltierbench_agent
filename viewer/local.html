@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Peltier Bench (local)</title>
+<style>
+:root{--bg:#f1f4f6;--panel:#fff;--ink:#13202b;--muted:#566673;--line:#d3dce2;--grid:#e4eaee;--cool:#1f6fd1;--heat:#d6392f;--b:#0a7c76;--ok:#1d8a4d;--bad:#c0392b;--warn:#b86e00}
+@media (prefers-color-scheme:dark){:root{--bg:#0e161c;--panel:#15202a;--ink:#e5edf2;--muted:#92a3b0;--line:#27353f;--grid:#1d2a33;--cool:#4d9cff;--heat:#ff6c5f;--b:#34c7bd;--ok:#4cc27f;--bad:#ff7a6b;--warn:#e9a244;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 system-ui,"Segoe UI",sans-serif;padding:16px max(16px,env(safe-area-inset-right)) 40px max(16px,env(safe-area-inset-left))}
+.wrap{max-width:1300px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+h1{font-size:24px;margin:0;font-weight:600}
+h2{font-size:12px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);margin:0 0 8px}
+.box{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:12px 14px;min-width:0}
+header{display:flex;flex-wrap:wrap;gap:8px 20px;align-items:center;justify-content:space-between}
+.pill{display:inline-block;padding:2px 10px;border-radius:999px;border:1px solid var(--line);font-size:13px}
+.pill.ok{color:var(--ok);border-color:var(--ok)}.pill.bad{color:var(--bad);border-color:var(--bad)}.pill.warn{color:var(--warn);border-color:var(--warn)}
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.card .k{font-size:11.5px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.card .v{font:500 24px/1.2 ui-monospace,Consolas,monospace}
+.card .s{font-size:12.5px;color:var(--muted)}
+canvas{display:block;width:100%}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{text-align:left;padding:5px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{font-size:11.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+td{font-family:ui-monospace,Consolas,monospace;font-size:12.5px}
+.scroll{overflow-x:auto;max-height:340px;overflow-y:auto}
+pre{margin:0;font:12.5px/1.45 ui-monospace,Consolas,monospace;white-space:pre-wrap;max-height:240px;overflow:auto}
+button{font:inherit;padding:6px 12px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);cursor:pointer}
+button.stop{border-color:var(--bad);color:var(--bad);font-weight:600}
+.legend{display:flex;flex-wrap:wrap;gap:4px 16px;font-size:13px;color:var(--muted)}
+.legend i{display:inline-block;width:16px;height:3px;margin-right:6px;vertical-align:middle;border-radius:2px}
+.hint{font-size:12.5px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Peltier Bench</h1>
+    <div><span id="conn" class="pill warn">connecting…</span> <span id="link" class="hint"></span> <span id="age" class="hint"></span>
+      <button class="stop" id="estop" title="Sends 's': Peltier off, PID stopped">Emergency stop</button></div>
+  </header>
+  <div class="box" id="expbox" hidden><h2>Experiment</h2><div id="exptext"></div></div>
+  <div class="cards">
+    <div class="card"><div class="k">Water (filtered)</div><div class="v" id="c-t3">-</div><div class="s" id="c-t3s">raw -</div></div>
+    <div class="card"><div class="k">Setpoint</div><div class="v" id="c-sp">-</div><div class="s" id="c-spd">error -</div></div>
+    <div class="card"><div class="k">Output</div><div class="v" id="c-pwm">-</div><div class="s" id="c-dir">-</div></div>
+    <div class="card"><div class="k">Phase</div><div class="v" id="c-ph" style="font-size:20px">-</div><div class="s" id="c-fw">fw -</div></div>
+    <div class="card"><div class="k">Gains</div><div class="v" id="c-g" style="font-size:16px">-</div><div class="s" id="c-g2">-</div></div>
+  </div>
+  <div class="box">
+    <div class="legend"><span><i style="background:var(--b)"></i>water (filtered)</span><span><i style="background:var(--ink)"></i>setpoint</span><span><i style="background:var(--cool)"></i>cooling</span><span><i style="background:var(--heat)"></i>heating</span></div>
+    <canvas id="chart" height="340" role="img" aria-label="Live water temperature, setpoint and output"></canvas>
+  </div>
+  <div class="box"><h2>Rig messages</h2><pre id="events">Waiting…</pre></div>
+  <div class="box"><h2>Experiment ledger</h2><div class="scroll"><table id="ledger"><tbody><tr><td>Loading…</td></tr></tbody></table></div><p class="hint" id="notes"></p></div>
+</div>
+<script>
+const $=s=>document.querySelector(s),css=n=>getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const fmt=(v,d=1)=>v==null?'-':Number(v).toFixed(d);
+let pts=[];
+async function poll(){
+  try{
+    const s=await (await fetch('/api/state')).json();
+    $('#conn').textContent=s.connected?'rig connected':'rig not connected';$('#conn').className='pill '+(s.connected?'ok':'bad');
+    $('#link').textContent=s.link||'';$('#age').textContent=s.age==null?'':'last data '+s.age+' s ago';
+    pts=s.points.map(p=>({x:p[0],t3f:p[1],sp:p[2],pwm:p[3],dir:p[4]}));
+    const t=s.tele;
+    if(t){
+      $('#c-t3').textContent=fmt(t.t3f,2)+' °C';$('#c-t3s').textContent='raw '+fmt(t.t3,1);
+      $('#c-sp').textContent=fmt(t.sp,1)+' °C';$('#c-spd').textContent='error '+(t.t3f==null||t.sp==null?'-':(t.t3f-t.sp>=0?'+':'')+fmt(t.t3f-t.sp,2));
+      $('#c-pwm').textContent=fmt(t.pwm,0)+' %';$('#c-pwm').style.color=t.dir>0?'var(--cool)':t.dir<0?'var(--heat)':'';
+      $('#c-dir').textContent=t.dir>0?'cooling':t.dir<0?'heating':'off';
+      const ph=$('#c-ph');ph.textContent=t.ph||'-';ph.style.color=/FAULT/.test(t.ph||'')?'var(--bad)':(t.ph==='COOLDOWN'?'var(--warn)':'');
+    }
+    const p=s.params||{};$('#c-fw').textContent='fw '+(s.fw||'?');
+    $('#c-g').textContent='Kp '+fmt(p.kp,0)+'  Ki '+fmt(p.ki,2)+'  Kd '+fmt(p.kd,0);
+    $('#c-g2').textContent='filter '+fmt(p.alpha,2)+' · deadband '+(p.usedead?'on':'off');
+    const e=s.exp||{},b=$('#expbox');b.hidden=!e.running;
+    if(e.running)$('#exptext').textContent=`${e.tag}: ${e.phase} phase, ${e.elapsed_min??0} of ${e.of_min??'?'} min at setpoint ${e.sp??'-'} °C`;
+    $('#events').textContent=s.events.map(x=>new Date(x[0]*1000).toLocaleTimeString()+'  '+x[1]).join('\n')||'No messages yet';
+    draw();
+  }catch(err){$('#conn').textContent='viewer lost the daemon';$('#conn').className='pill bad'}
+}
+$('#estop').onclick=async()=>{await fetch('/api/abort',{method:'POST',body:'{}'});poll()};
+function draw(){
+  const c=$('#chart'),dpr=devicePixelRatio||1,W=c.clientWidth,H=c.clientHeight;c.width=W*dpr;c.height=H*dpr;
+  const g=c.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);
+  if(pts.length<2){g.fillStyle=css('--muted');g.font='14px system-ui';g.fillText('Waiting for data…',20,30);return}
+  const L=46,R=10,T=8,B=22,split=H-B-76,pw=W-L-R;
+  const x0=pts[0].x,x1=pts[pts.length-1].x,xs=v=>L+(v-x0)/Math.max(1,x1-x0)*pw;
+  let lo=1e9,hi=-1e9;for(const p of pts)for(const v of[p.t3f,p.sp]){if(v==null)continue;lo=Math.min(lo,v);hi=Math.max(hi,v)}
+  const m=Math.max(.5,(hi-lo)*.1);lo-=m;hi+=m;const ys=v=>T+(1-(v-lo)/(hi-lo))*(split-T);
+  g.font='11px ui-monospace,monospace';g.fillStyle=css('--muted');g.strokeStyle=css('--grid');g.textAlign='right';g.textBaseline='middle';
+  const raw=(hi-lo)/4,mag=Math.pow(10,Math.floor(Math.log10(raw))),fr=raw/mag,step=mag*(fr<1.5?1:fr<3?2:fr<7?5:10);
+  for(let v=Math.ceil(lo/step)*step;v<=hi;v+=step){const y=Math.round(ys(v))+.5;g.beginPath();g.moveTo(L,y);g.lineTo(L+pw,y);g.stroke();g.fillText(v.toFixed(step<1?1:0),L-6,y)}
+  const line=(k,col,w,dash)=>{g.strokeStyle=col;g.lineWidth=w;g.setLineDash(dash||[]);g.beginPath();let on=false;
+    for(const p of pts){const v=p[k];if(v==null){on=false;continue}const x=xs(p.x),y=ys(v);if(!on){g.moveTo(x,y);on=true}else g.lineTo(x,y)}g.stroke();g.setLineDash([])};
+  line('sp',css('--ink'),1.2,[6,4]);line('t3f',css('--b'),1.8);
+  const base=H-B,top=split+10;g.strokeStyle=css('--grid');g.strokeRect(L+.5,top+.5,pw-1,base-top-1);
+  const bw=Math.max(1,pw/pts.length);
+  for(const p of pts){if(!p.pwm)continue;const h=(base-top)*p.pwm/100;g.fillStyle=p.dir>0?css('--cool'):css('--heat');g.fillRect(xs(p.x),base-h,bw,h)}
+  g.fillStyle=css('--muted');g.textAlign='center';g.textBaseline='top';
+  for(let i=0;i<=4;i++){const v=x0+(x1-x0)*i/4;g.fillText(new Date(v*1000).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'}),L+pw*i/4,base+5)}
+  g.textAlign='right';g.textBaseline='middle';g.fillText('100%',L-6,top+6);g.fillText('0',L-6,base-4);
+}
+addEventListener('resize',draw);
+async function ledger(){
+  try{
+    const t=await (await fetch('/ledger/experiments.jsonl')).text();
+    const rows=t.trim().split('\n').filter(Boolean).map(l=>{try{return JSON.parse(l)}catch(e){return null}}).filter(Boolean).reverse();
+    const tb=$('#ledger');if(!rows.length){tb.innerHTML='<tbody><tr><td>No experiments yet.</td></tr></tbody>';return}
+    tb.innerHTML='<thead><tr><th>When</th><th>Tag</th><th>SP</th><th>Settings</th><th>Reach</th><th>Over</th><th>Offset</th><th>σ</th><th>Cycles</th><th>Score</th><th>Result</th></tr></thead><tbody>'+
+     rows.map(r=>{const m=r.metrics||{};return `<tr><td>${(r.when||'').replace('T',' ').slice(0,16)}</td><td>${r.tag}</td><td>${r.sp}</td><td>${Object.entries(r.set||{}).map(e=>e.join('=')).join(' ')}</td><td>${m.reach_min??'never'}</td><td>${m.overshoot_c??''}</td><td>${m.tail_offset_c??''}</td><td>${m.tail_sd_c??''}</td><td>${m.cycles??''}</td><td>${m.score??''}</td><td>${r.aborted?'ABORTED: '+r.aborted:'ok'}</td></tr>`}).join('')+'</tbody>';
+    const n=await (await fetch('/ledger/NOTES.md')).text();$('#notes').textContent=n.slice(-500);
+  }catch(e){}
+}
+poll();ledger();setInterval(poll,2000);setInterval(ledger,30000);
+</script>
+</body>
+</html>

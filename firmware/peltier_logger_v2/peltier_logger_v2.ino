@@ -47,7 +47,7 @@
 #include <sys/time.h>
 #include <stdarg.h>
 #include <math.h>
-#define FW_VERSION "2.0.2-agent"
+#define FW_VERSION "2.0.3-agent"
 
 // The Arduino builder inserts function prototypes above the first function, which now comes before this struct is
 // defined; the forward declaration keeps those prototypes valid.
@@ -1411,6 +1411,7 @@ void handleCommand(String cmd) {
   String raw = cmd;                      // keeps the case, needed for URLs and tags
   cmd.toLowerCase();
   if (cmd.length() == 0) return;
+  lastRemote = millis();                 // any command (USB, TCP or MQTT) counts as a sign of life for the dead-man timer
 
   if (replyTo == &mqttPrint && !remoteAllowed(cmd)) {
     reply("# Not allowed over MQTT: %s\n", cmd.c_str());

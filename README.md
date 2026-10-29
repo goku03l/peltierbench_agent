@@ -1,5 +1,22 @@
 # peltierbench_agent
 
+> **Mode: local.** The rig is driven from a laptop next to it, over USB or WiFi, by Claude Code plus the tools in `tools/`.
+> The cloud path described further down (MQTT broker, GitHub Actions experiments, OTA) is optional and not in use.
+
+## Local quick start
+```
+python tools/bench_local.py daemon --serial COM5      # USB   (or: --tcp motor-logger.local   for WiFi)
+# open http://127.0.0.1:8765 for the live viewer
+python tools/bench_local.py status
+python tools/bench_local.py experiment --tag step20 --sp 20 --minutes 60 --set ki=0.6 usedead=0 --pre-sp 24 --pre-minutes 20
+python tools/bench_local.py wait
+python tools/bench_local.py abort
+```
+Compile and flash with arduino-cli (see `tools/flash.ps1`). `tools/fake_rig.py` is a stand-in for the ESP32 for testing.
+The daemon owns the connection (USB or the single TCP slot); do not open the Arduino serial monitor while it runs.
+
+---
+
 Hosted, agent-driven tuning for the ESP32 Peltier water bath. Nothing here needs your PC to stay on.
 
 ```
