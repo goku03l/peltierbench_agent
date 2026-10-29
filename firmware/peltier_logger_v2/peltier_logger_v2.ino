@@ -47,7 +47,11 @@
 #include <sys/time.h>
 #include <stdarg.h>
 #include <math.h>
-#define FW_VERSION "2.0.1-agent"
+#define FW_VERSION "2.0.2-agent"
+
+// The Arduino builder inserts function prototypes above the first function, which now comes before this struct is
+// defined; the forward declaration keeps those prototypes valid.
+struct ZoneState;
 
 // Firmware images are public, so no credentials are compiled in. WiFi and broker settings are stored in flash and
 // set once over USB with the 'cfg' commands. 'ota' only accepts URLs under this prefix.
